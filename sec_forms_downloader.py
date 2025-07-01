@@ -240,10 +240,61 @@ print(filings_list_10K)
 
 # ...existing code...
 
-def download_filing_file(filing: dict, content_key: str = "file_content") -> None:
+# def download_filing_file(filing: dict, content_key: str = "file_content") -> None:
+#     """
+#     Download the file from the 'link' URL in the filing dict and save its content
+#     as a new key (default: 'file_content') in the same dictionary.
+#     """
+#     url = filing.get("link")
+#     if not url or not isinstance(url, str):
+#         filing[content_key] = None
+#         return
+#     # Remove Excel HYPERLINK formula if present
+#     if url.startswith('=HYPERLINK('):
+#         # Extract the actual URL from the formula
+#         url = url.split('"')[1]
+#     try:
+#         resp = requests.get(url, headers=SECFilingAgent.HEADERS)
+#         resp.raise_for_status()
+#         filing[content_key] = resp.content
+#     except Exception as e:
+#         filing[content_key] = None
+#         print(f"Failed to download {url}: {e}")
+
+# # Example usage:
+# for f in filings_list:
+#     download_filing_file(f)
+
+
+# Integrate load_pages to store markdown-formatted pages in the filing dict
+# Assume md (markdownify) and load_pages are available in the environment
+# If not, user should define/import them appropriately
+from markdownify import markdownify as md
+
+def load_pages(file: str) -> list:
     """
-    Download the file from the 'link' URL in the filing dict and save its content
-    as a new key (default: 'file_content') in the same dictionary.
+    Load the pages from a 10k filing.
+
+    Args:
+        file: The path to the HTML 10k filing
+
+    Returns:
+        List[str]: A list of markdown-formatted pages
+    """
+    # Read the file in as a string
+    data = open(file, encoding="latin-1").read()
+
+    # Convert to markdown. This removes a lot of the extra HTML
+    # formatting that can be token-heavy.
+    markdown_document = md(data, strip=["a", "b", "i", "u", "code", "pre"])
+
+    # Split the document into pages
+    return [page.strip() for page in markdown_document.split("\n---\n")]
+
+def download_filing_file_markdown(filing: dict, content_key: str = "markdown_pages") -> None:
+    """
+    Download the file from the 'link' URL in the filing dict, convert its HTML content
+    to markdown-formatted pages, and save as a new key (default: 'markdown_pages') in the dict.
     """
     url = filing.get("link")
     if not url or not isinstance(url, str):
@@ -251,18 +302,44 @@ def download_filing_file(filing: dict, content_key: str = "file_content") -> Non
         return
     # Remove Excel HYPERLINK formula if present
     if url.startswith('=HYPERLINK('):
-        # Extract the actual URL from the formula
         url = url.split('"')[1]
     try:
         resp = requests.get(url, headers=SECFilingAgent.HEADERS)
         resp.raise_for_status()
-        filing[content_key] = resp.content
+        # Convert HTML content to string using latin-1 encoding
+        html_str = resp.content.decode("latin-1", errors="replace")
+        # Convert to markdown
+        markdown_document = md(html_str, strip=["a", "b", "i", "u", "code", "pre"])
+        # Split into pages
+        pages = [page.strip() for page in markdown_document.split("\n---\n")]
+        filing[content_key] = pages
     except Exception as e:
         filing[content_key] = None
-        print(f"Failed to download {url}: {e}")
+        print(f"Failed to download or convert {url}: {e}")
 
-Example usage:
+# Example usage:
 for f in filings_list:
-    download_filing_file(f)
+    download_filing_file_markdown(f)
+
+# Print each markdown page of the first filing, with page numbers and separators
+first_filing = filings_list[0] if filings_list else None
+if first_filing and "markdown_pages" in first_filing and first_filing["markdown_pages"]:
+    for idx, page in enumerate(first_filing["markdown_pages"], start=1):
+        print(f"\n{'-'*20} page {idx} {'-'*20}\n")
+        print(page)
+else:
+    print("No markdown content available for the first filing.")
 
 
+import os
+
+# Save filings_list as a text file in the home directory
+# Save to the root of the current repository
+home_dir = os.path.dirname(os.path.abspath(__file__))
+txt_path = os.path.join(home_dir, "filings_list.txt")
+with open(txt_path, "w", encoding="utf-8") as f_txt:
+    for filing in filings_list:
+        # Write each filing as a line of key: value pairs
+        line = "; ".join(f"{k}: {v}" for k, v in filing.items())
+        f_txt.write(line + "\n")
+print(f"filings_list saved as text to {txt_path}")
