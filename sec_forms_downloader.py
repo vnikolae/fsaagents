@@ -229,12 +229,14 @@ class SECFilingAgent:
 # Example usage in Spyder
 agent = SECFilingAgent()
 filings_list = agent.get_filings('NFLX', '10-K', years_back=10)
-# agent.save_to_excel(filings_list, 'NFLX_10Ks_combined_10yrs.xlsx')
+agent.save_to_excel(filings_list, 'NFLX_10Ks_combined_10yrs.xlsx')
 
 
 filings_list_10K = agent.get_filings('NFLX', '10-K', years_back=5)
 filings_list_10Q = agent.get_filings('NFLX', '10-Q', years_back=5)
 filings_list_8K = agent.get_filings('NFLX', '8-K', years_back=5)
+
+print(filings_list_10K)
 
 # ...existing code...
 
@@ -259,6 +261,8 @@ def download_filing_file(filing: dict, content_key: str = "file_content") -> Non
         filing[content_key] = None
         print(f"Failed to download {url}: {e}")
 
-# Example usage:
-# for f in filings_list:
-#     download_filing_file(f)
+Example usage:
+for f in filings_list:
+    download_filing_file(f)
+
+
